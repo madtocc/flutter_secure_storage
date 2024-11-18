@@ -23,16 +23,29 @@ enum KeychainAccessibility {
   first_unlock_this_device,
 }
 
+enum AccessControl {
+  user_presence,
+  biometry_any,
+  biometry_current_set,
+  device_passcode,
+}
+
 abstract class AppleOptions extends Options {
   const AppleOptions({
     String? groupId,
     String? accountName = AppleOptions.defaultAccountName,
     KeychainAccessibility? accessibility = KeychainAccessibility.unlocked,
     bool synchronizable = false,
+    AccessControl? accessControl,
   })  : _groupId = groupId,
         _accessibility = accessibility,
         _accountName = accountName,
-        _synchronizable = synchronizable;
+        _synchronizable = synchronizable,
+        _accessControl = accessControl,
+        assert(
+          accessControl == null || !synchronizable,
+          'synchronizable cannot be true when accessControl is provided',
+        );
 
   static const defaultAccountName = 'flutter_secure_storage_service';
 
@@ -56,6 +69,32 @@ abstract class AppleOptions extends Options {
   /// (kSecAttrSynchronizable)
   final bool _synchronizable;
 
+  /// Specifies the access control policy for the keychain item.
+  ///
+  /// The [AccessControl] enum defines the security requirements that must be met
+  /// to access the keychain item. This includes conditions such as requiring user
+  /// presence, biometric authentication, or device passcode. Setting an appropriate
+  /// access control ensures that sensitive data is protected according to the desired
+  /// security standards.
+  ///
+  /// **Important:** When [accessControl] is provided, the `synchronizable` property
+  /// cannot be set to `true`. This restriction ensures that the synchronization
+  /// behavior does not conflict with the specified access control policies.
+  ///
+  /// Example usage:
+  /// ```dart
+  /// var options = AppleOptions(
+  ///   accessControl: AccessControl.biometry_any,
+  ///   synchronizable: false,
+  /// );
+  /// ```
+  ///
+  /// Available [AccessControl] options:
+  /// - `user_presence`: Requires the user's presence for access.
+  /// - `biometry_any`: Allows access with any enrolled biometric method.
+  /// - `biometry_current_set`: Restricts access to the currently enrolled set of biometrics.
+  /// - `device_passcode`: Requires the device passcode for access.
+  final AccessControl? _accessControl;
   @override
   Map<String, String> toMap() => <String, String>{
         if (_accessibility != null)
@@ -65,5 +104,6 @@ abstract class AppleOptions extends Options {
         if (_accountName != null) 'accountName': _accountName!,
         if (_groupId != null) 'groupId': _groupId!,
         'synchronizable': '$_synchronizable',
+        if (_accessControl != null) 'accessControl': _accessControl!.name,
       };
 }

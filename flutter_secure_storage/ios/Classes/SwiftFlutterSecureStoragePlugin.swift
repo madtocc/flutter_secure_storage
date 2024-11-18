@@ -88,7 +88,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin, FlutterSt
             return
         }
 
-        let response = flutterSecureStorageManager.read(key: values.key!, groupId: values.groupId, accountName: values.accountName)
+        let response = flutterSecureStorageManager.read(key: values.key!, groupId: values.groupId, accountName: values.accountName, accessControl:  values.accessControl)
         handleResponse(response, result)
     }
 
@@ -109,7 +109,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin, FlutterSt
             return
         }
 
-        let response = flutterSecureStorageManager.write(key: values.key!, value: values.value!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable, accessibility: values.accessibility)
+        let response = flutterSecureStorageManager.write(key: values.key!, value: values.value!, groupId: values.groupId, accountName: values.accountName, synchronizable: values.synchronizable, accessibility: values.accessibility,accessControl: values.accessControl)
 
         handleResponse(response, result)
     }
@@ -181,6 +181,7 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin, FlutterSt
 
         let key = arguments["key"] as? String
         let accessibility = options["accessibility"] as? String
+        let accessControl = options["accessControl"] as? String
         let value = arguments["value"] as? String
 
         return FlutterSecureStorageRequest(
@@ -188,18 +189,22 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin, FlutterSt
             groupId: groupId,
             synchronizable: synchronizable,
             accessibility: accessibility,
+            accessControl: accessControl,
             key: key,
             value: value
         )
     }
 
-    private func handleResponse(_ response: FlutterSecureStorageResponse, _ result: @escaping FlutterResult) {
-        if let status = response.status {
-            if (status == noErr) {
+    private func handleResponse(_ response: FlutterSecureStorageResponse, _ result: @escaping FlutterResult) {    
+        if let status = response.status {            
+            if status == errSecSuccess {
                 result(response.value)
+            } else if status == errSecUserCanceled {
+                result(FlutterError(code: "AuthCanceled", message: "User canceled authentication.", details: nil))
+            } else if status == errSecAuthFailed {
+                result(FlutterError(code: "AuthFailed", message: "Authentication failed.", details: nil))
             } else {
                 var errorMessage = ""
-
                 if #available(iOS 11.3, *) {
                     if let errMsg = SecCopyErrorMessageString(status, nil) {
                         errorMessage = "Code: \(status), Message: \(errMsg)"
@@ -209,18 +214,21 @@ public class SwiftFlutterSecureStoragePlugin: NSObject, FlutterPlugin, FlutterSt
                 } else {
                     errorMessage = "Unknown security result code: \(status)"
                 }
-                result(FlutterError.init(code: "Unexpected security result code", message: errorMessage, details: status))
+                result(FlutterError(code: "KeychainError", message: errorMessage, details: status))
             }
         } else {
             result(response.value)
         }
     }
 
+
+
     struct FlutterSecureStorageRequest {
         var accountName: String?
         var groupId: String?
         var synchronizable: Bool?
         var accessibility: String?
+        var accessControl: String?
         var key: String?
         var value: String?
     }
